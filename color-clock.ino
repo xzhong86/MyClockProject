@@ -20,7 +20,7 @@ void setup() {
 
 uint8_t led_d7g_data[4][3]; // R G B
 
-void led_output(uint8_t idx, uint8_t num) {
+void led_output(uint8_t idx) {
   digitalWrite(P_LE, HIGH);
   digitalWrite(P_EN, LOW);
   digitalWrite(P_D0, idx & 1 ? HIGH : LOW);
@@ -40,7 +40,7 @@ void led_output(uint8_t idx, uint8_t num) {
 // each num: bit 3:0 is number, bit 6:4 is color, r/g/b
 static uint8_t num2led_map[] = {
  0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d,  // 0-5
- 0x7d, 0x07, 0x7f, 0x4f, 0x77, 0x7c,  // 6-b
+ 0x7d, 0x07, 0x7f, 0x6f, 0x77, 0x7c,  // 6-b
  0x39, 0x5e, 0x79, 0x71               // c-f
 };
 void led_update_bits(uint8_t nums[4], uint8_t dps[4]) {
@@ -65,14 +65,39 @@ void led_update_nums(uint8_t nums[4], uint8_t rgb) {
 void led_update_dp(uint8_t idx, uint8_t rgb) {
   led_dps[idx] = rgb;
 }
+void led_update_dps(uint8_t dps, uint8_t rgb) {
+  for (int i = 0; i < 4; i ++) {
+    led_update_dp(i, (dps & (1 << i)) ? rgb : 0);
+  }
+}
+
+void led_clear() {
+  for (int i = 0; i < 4; i ++) {
+    led_nums[i] = 0;
+    led_dps[i] = 0;
+  }
+}
+
+
+void led_display(int cnt) {
+  for (int i = 0; i < 4; i ++) {
+    uint8_t rgb = (cnt + i) & 7;
+    rgb += rgb == 0 ? 1 : 0;
+    led_update_num(i, (cnt + i) % 16, rgb);
+  }
+  uint8_t rgb = cnt & 7;
+  rgb += rgb == 0 ? 1 : 0;
+  led_update_dps(1 << (cnt & 3), rgb);
+}
 
 int loop_cnt = 0;
 void loop() {
   delay(1);
-  uint8_t numbs[4] = { 2, 3, 4, 5 };
-  led_update_nums(numbs, RGB_R | RGB_B);
+  //uint8_t numbs[4] = { 2, 3, 4, 5 };
+  //led_update_nums(numbs, RGB_R | RGB_B);
+  led_display(loop_cnt / 1024);
   led_update_bits(led_nums, led_dps);
-  led_output(loop_cnt & 3, 1);
+  led_output(loop_cnt & 3);
   loop_cnt ++;
 }
 
