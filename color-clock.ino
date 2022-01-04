@@ -103,10 +103,11 @@ void led_display_task() {
 ThreeWire myWire(7, 8, 6); // IO, SCLK, CE
 RtcDS1302<ThreeWire> Rtc(myWire);
 
-void setup_rtc() {
+void rtc_setup() {
     Rtc.Begin();
 
     RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
+    Serial.print("Compile time: ");
     printDateTime(compiled);
     Serial.println();
 
@@ -147,11 +148,11 @@ void setup_rtc() {
         Serial.println("RTC is the same as compile time! (not expected but all is fine)");
     }
 }
-void rtc_print_time() {
+void rtc_print_time(bool nl) {
     RtcDateTime now = Rtc.GetDateTime();
 
     printDateTime(now);
-    Serial.println();
+    if (nl) Serial.println();
 
     if (!now.IsValid()) {
         //the battery on the device is low or even missing and the power line was disconnected
@@ -177,17 +178,47 @@ int read_light_sensor() {
     return analogRead(A0);
 }
 
+void beep_out(int val) {  // pwm 0 - 255
+    analogWrite(A2, val);
+}
+
 // ******** Application code ********
 
-void led_display(int cnt) {
-  for (int i = 0; i < 4; i ++) {
-    uint8_t rgb = (cnt + i) & 7;
+void time_display_task() {
+    static uint8_t last_minu = 0xff;
+    static uint8_t last_sec = 0xff;
+    RtcDateTime now = Rtc.GetDateTime();
+    uint8_t hour = now.Hour();
+    uint8_t minu = now.Minute();
+    uint8_t sec  = now.Second();
+    uint8_t rgb = sec & 7;
     rgb += rgb == 0 ? 1 : 0;
-    led_put_num(i, (cnt + i) % 16, rgb);
-  }
-  uint8_t rgb = cnt & 7;
-  rgb += rgb == 0 ? 1 : 0;
-  led_put_dps(1 << (cnt & 3), rgb);
+    if (minu != last_minu) {
+        bool pm = hour > 12;
+        hour   -= hour > 12 ? 12 : 0;
+        led_put_num(0, hour > 9 ? 1 : 0, hour > 9 ? rgb : 0);
+        led_put_num(1, hour % 10, rgb);
+        led_put_num(2, minu / 10, rgb);
+        led_put_num(3, minu % 10, rgb);
+        led_put_dp(0, rgb);    // 'PM' mark
+        last_minu = minu;
+    }
+    if (sec != last_sec) {
+        led_put_dp(1, sec & 1 ? rgb : 0);
+        last_sec = sec;
+    }
+}
+
+void led_test_task() {
+    int cnt = millis() / 1024;
+    for (int i = 0; i < 4; i ++) {
+        uint8_t rgb = (cnt + i) & 7;
+        rgb += rgb == 0 ? 1 : 0;
+        led_put_num(i, (cnt + i) % 16, rgb);
+    }
+    uint8_t rgb = cnt & 7;
+    rgb += rgb == 0 ? 1 : 0;
+    led_put_dps(1 << (cnt & 3), rgb);
 }
 
 void print_task() {
@@ -199,21 +230,36 @@ void print_task() {
     //Serial.println(now, DEC);
     int light = read_light_sensor();
     Serial.print("light=");
-    Serial.println(light, DEC);
-    rtc_print_time();
+    Serial.print(light, DEC);
+    Serial.print(", time: ");
+    rtc_print_time(true);
     last_print = now;
+}
+
+void beep_task() {
+    static unsigned long last_beep = 0;
+    unsigned long now = millis();
+    beep_out(120);
+    if (now - last_beep < 1000)
+        return;
+    int sec = now / 1000;
+    //beep_out((sec % 5) * 50);
+    last_beep = now;
 }
 
 void setup() {
     led_setup();
     Serial.begin(9600);
+    rtc_setup();
 
     Serial.println("setup done.");
 }
 
 void loop() {
-    led_display(millis() / 1024);
+    //led_test_task();
+    time_display_task();
     led_display_task();
     print_task();
+    //beep_task();
 }
 
