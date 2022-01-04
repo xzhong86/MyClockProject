@@ -172,6 +172,10 @@ void printDateTime(const RtcDateTime& dt)
     Serial.print(datestring);
 }
 
+// ******** sensor ********
+int read_light_sensor() {
+    return analogRead(A0);
+}
 
 // ******** Application code ********
 
@@ -189,10 +193,13 @@ void led_display(int cnt) {
 void print_task() {
     static unsigned long last_print = 0;
     unsigned long now = millis();
-    if (now - last_print < 1000)
+    if (now - last_print < 3000)
         return;
-    Serial.print("beat message ");
-    Serial.println(now, DEC);
+    //Serial.print("beat message ");
+    //Serial.println(now, DEC);
+    int light = read_light_sensor();
+    Serial.print("light=");
+    Serial.println(light, DEC);
     rtc_print_time();
     last_print = now;
 }
@@ -201,7 +208,7 @@ void setup() {
     led_setup();
     Serial.begin(9600);
 
-    Serial.print("setup done.\n");
+    Serial.println("setup done.");
 }
 
 void loop() {
