@@ -6,7 +6,7 @@
 #define P_D0 4
 #define P_EN 5
 
-void setup() {
+void led_setup() {
   pinMode(P_LE, OUTPUT);
   pinMode(P_D1, OUTPUT);
   pinMode(P_D0, OUTPUT);
@@ -55,19 +55,19 @@ void led_update_bits(uint8_t nums[4], uint8_t dps[4]) {
   }
 }
 static uint8_t led_nums[4], led_dps[4];
-void led_update_num(uint8_t idx, uint8_t num, uint8_t rgb) {
+void led_put_num(uint8_t idx, uint8_t num, uint8_t rgb) {
   led_nums[idx] = (num & 0xf) | (rgb << 4);
 }
-void led_update_nums(uint8_t nums[4], uint8_t rgb) {
+void led_put_nums(uint8_t nums[4], uint8_t rgb) {
   for (int i = 0; i < 4; i ++)
-    led_update_num(i, nums[i], rgb);
+    led_put_num(i, nums[i], rgb);
 }
-void led_update_dp(uint8_t idx, uint8_t rgb) {
+void led_put_dp(uint8_t idx, uint8_t rgb) {
   led_dps[idx] = rgb;
 }
-void led_update_dps(uint8_t dps, uint8_t rgb) {
+void led_put_dps(uint8_t dps, uint8_t rgb) {
   for (int i = 0; i < 4; i ++) {
-    led_update_dp(i, (dps & (1 << i)) ? rgb : 0);
+    led_put_dp(i, (dps & (1 << i)) ? rgb : 0);
   }
 }
 
@@ -78,26 +78,35 @@ void led_clear() {
   }
 }
 
+void led_display_task() {
+    static unsigned long last_update = 0;
+    static uint8_t update_cnt = 0;
+    unsigned long now = millis();
+    if (now - last_update < 1) // update period
+        return;
+    led_update_bits(led_nums, led_dps);
+    led_output(update_cnt & 3);
+    last_update = now;
+    update_cnt ++;
+}
 
 void led_display(int cnt) {
   for (int i = 0; i < 4; i ++) {
     uint8_t rgb = (cnt + i) & 7;
     rgb += rgb == 0 ? 1 : 0;
-    led_update_num(i, (cnt + i) % 16, rgb);
+    led_put_num(i, (cnt + i) % 16, rgb);
   }
   uint8_t rgb = cnt & 7;
   rgb += rgb == 0 ? 1 : 0;
-  led_update_dps(1 << (cnt & 3), rgb);
+  led_put_dps(1 << (cnt & 3), rgb);
 }
 
-int loop_cnt = 0;
+void setup() {
+    led_setup();
+}
+
 void loop() {
-  delay(1);
-  //uint8_t numbs[4] = { 2, 3, 4, 5 };
-  //led_update_nums(numbs, RGB_R | RGB_B);
-  led_display(loop_cnt / 1024);
-  led_update_bits(led_nums, led_dps);
-  led_output(loop_cnt & 3);
-  loop_cnt ++;
+    led_display(millis() / 1024);
+    led_display_task();
 }
 
