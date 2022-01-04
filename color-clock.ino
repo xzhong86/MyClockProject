@@ -90,8 +90,8 @@ void led_clear() {
 void led_display_task() {
     static unsigned long last_update = 0;
     static uint8_t update_cnt = 0;
-    unsigned long now = millis();
-    if (now - last_update < 1) // update period
+    unsigned long now = micros();
+    if (now - last_update < 250) // update period
         return;
     bool led_on = ((1 << ((update_cnt >> 2) & 7)) & led_brightness_mask) != 0;
     led_update_bits(led_nums, led_dps);
@@ -199,7 +199,7 @@ void time_display_task() {
     uint8_t hour = now.Hour();
     uint8_t minu = now.Minute();
     uint8_t sec  = now.Second();
-    led_set_brightness(3);
+    led_set_brightness(4);
     if (minu != last_minu) {
         bool pm = hour > 12;
         hour   -= hour > 12 ? 12 : 0;
