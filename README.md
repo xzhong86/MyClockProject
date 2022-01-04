@@ -28,3 +28,8 @@ arduino project management:
 ~/opt/bin/arduino-cli upload -p /dev/ttyUSB0 --fqbn arduino:avr:nano MyBlink
 ```
 
+install library:
+```sh
+~/opt/bin/arduino-cli lib install "Rtc by Makuna"
+```
+

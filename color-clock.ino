@@ -101,12 +101,26 @@ void led_display(int cnt) {
   led_put_dps(1 << (cnt & 3), rgb);
 }
 
+void print_task() {
+    static unsigned long last_print = 0;
+    unsigned long now = millis();
+    if (now - last_print < 1000)
+        return;
+    Serial.print("beat message ");
+    Serial.println(now, DEC);
+    last_print = now;
+}
+
 void setup() {
     led_setup();
+    Serial.begin(9600);
+
+    Serial.print("setup done.\n");
 }
 
 void loop() {
     led_display(millis() / 1024);
     led_display_task();
+    print_task();
 }
 
