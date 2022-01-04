@@ -1,5 +1,7 @@
 
 #include <SPI.h>
+#include <ThreeWire.h>  // for RTC DS1302
+#include <RtcDS1302.h>  // for RTC DS1302
 
 #define P_LE 2
 #define P_D1 3
@@ -90,6 +92,89 @@ void led_display_task() {
     update_cnt ++;
 }
 
+
+// ******** RTC Module ********
+
+// refer to https://electropeak.com/learn/interfacing-ds1302-real-time-clock-rtc-module-with-arduino/
+// chinese version: https://blog.jmaker.com.tw/ds1302/
+// official: https://github.com/Makuna/Rtc/wiki
+// official example: https://github.com/Makuna/Rtc/blob/master/examples/DS1302_Simple/DS1302_Simple.ino
+
+ThreeWire myWire(7, 8, 6); // IO, SCLK, CE
+RtcDS1302<ThreeWire> Rtc(myWire);
+
+void setup_rtc() {
+    Rtc.Begin();
+
+    RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
+    printDateTime(compiled);
+    Serial.println();
+
+    if (!Rtc.IsDateTimeValid())
+    {
+        // Common Causes:
+        //    1) first time you ran and the device wasn't running yet
+        //    2) the battery on the device is low or even missing
+
+        Serial.println("RTC lost confidence in the DateTime!");
+        Rtc.SetDateTime(compiled);
+    }
+
+    if (Rtc.GetIsWriteProtected())
+    {
+        Serial.println("RTC was write protected, enabling writing now");
+        Rtc.SetIsWriteProtected(false);
+    }
+
+    if (!Rtc.GetIsRunning())
+    {
+        Serial.println("RTC was not actively running, starting now");
+        Rtc.SetIsRunning(true);
+    }
+
+    RtcDateTime now = Rtc.GetDateTime();
+    if (now < compiled)
+    {
+        Serial.println("RTC is older than compile time!  (Updating DateTime)");
+        Rtc.SetDateTime(compiled);
+    }
+    else if (now > compiled)
+    {
+        Serial.println("RTC is newer than compile time. (this is expected)");
+    }
+    else if (now == compiled)
+    {
+        Serial.println("RTC is the same as compile time! (not expected but all is fine)");
+    }
+}
+void rtc_print_time() {
+    RtcDateTime now = Rtc.GetDateTime();
+
+    printDateTime(now);
+    Serial.println();
+
+    if (!now.IsValid()) {
+        //the battery on the device is low or even missing and the power line was disconnected
+        Serial.println("RTC lost confidence in the DateTime!");
+    }
+}
+void printDateTime(const RtcDateTime& dt)
+{
+    char datestring[20];
+    snprintf_P(datestring, 20,
+               PSTR("%02u/%02u/%04u %02u:%02u:%02u"),
+               dt.Month(),
+               dt.Day(),
+               dt.Year(),
+               dt.Hour(),
+               dt.Minute(),
+               dt.Second() );
+    Serial.print(datestring);
+}
+
+
+// ******** Application code ********
+
 void led_display(int cnt) {
   for (int i = 0; i < 4; i ++) {
     uint8_t rgb = (cnt + i) & 7;
@@ -108,6 +193,7 @@ void print_task() {
         return;
     Serial.print("beat message ");
     Serial.println(now, DEC);
+    rtc_print_time();
     last_print = now;
 }
 
