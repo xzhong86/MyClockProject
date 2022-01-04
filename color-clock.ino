@@ -20,17 +20,17 @@ void led_setup() {
   SPI.begin();
 }
 
-uint8_t led_d7g_data[4][3]; // R G B
+static uint8_t led_d7g_data[4][3]; // R G B
 
-void led_output(uint8_t idx) {
+void led_refrash(uint8_t idx, bool _on) {
   digitalWrite(P_LE, HIGH);
   digitalWrite(P_EN, LOW);
   digitalWrite(P_D0, idx & 1 ? HIGH : LOW);
   digitalWrite(P_D1, idx & 2 ? HIGH : LOW);
   SPI.transfer(0x00);
-  SPI.transfer(led_d7g_data[idx][2]);
-  SPI.transfer(led_d7g_data[idx][1]);
-  SPI.transfer(led_d7g_data[idx][0]);
+  SPI.transfer(!_on ? 0 : led_d7g_data[idx][2]);
+  SPI.transfer(!_on ? 0 : led_d7g_data[idx][1]);
+  SPI.transfer(!_on ? 0 : led_d7g_data[idx][0]);
   digitalWrite(P_EN, HIGH);
   digitalWrite(P_LE, LOW);
 }
@@ -56,7 +56,7 @@ void led_update_bits(uint8_t nums[4], uint8_t dps[4]) {
     led_d7g_data[i][2] = ((color & RGB_B) ? led_bits : 0) | (dp & RGB_B ? 0x80 : 0);
   }
 }
-static uint8_t led_nums[4], led_dps[4];
+static uint8_t led_nums[4], led_dps[4], led_brightness_mask;
 void led_put_num(uint8_t idx, uint8_t num, uint8_t rgb) {
   led_nums[idx] = (num & 0xf) | (rgb << 4);
 }
@@ -72,6 +72,13 @@ void led_put_dps(uint8_t dps, uint8_t rgb) {
     led_put_dp(i, (dps & (1 << i)) ? rgb : 0);
   }
 }
+// 1-8: 8 level brightness, 0: no display
+void led_set_brightness(uint8_t brightness) {
+    static const uint8_t mask_map[9] = { 0x0, 0x1, 0x11, 0x49, 0x55, 0x57, 0x77, 0x7f, 0xff };
+    if (brightness > 8)
+        brightness = 8;
+    led_brightness_mask = mask_map[brightness];
+}
 
 void led_clear() {
   for (int i = 0; i < 4; i ++) {
@@ -86,8 +93,9 @@ void led_display_task() {
     unsigned long now = millis();
     if (now - last_update < 1) // update period
         return;
+    bool led_on = ((1 << ((update_cnt >> 2) & 7)) & led_brightness_mask) != 0;
     led_update_bits(led_nums, led_dps);
-    led_output(update_cnt & 3);
+    led_refrash(update_cnt & 3, led_on);
     last_update = now;
     update_cnt ++;
 }
@@ -191,11 +199,12 @@ void time_display_task() {
     uint8_t hour = now.Hour();
     uint8_t minu = now.Minute();
     uint8_t sec  = now.Second();
-    uint8_t rgb = sec & 7;
-    rgb += rgb == 0 ? 1 : 0;
+    led_set_brightness(3);
     if (minu != last_minu) {
         bool pm = hour > 12;
         hour   -= hour > 12 ? 12 : 0;
+        uint8_t rgb = minu & 7;
+        rgb += rgb == 0 ? 1 : 0;
         led_put_num(0, hour > 9 ? 1 : 0, hour > 9 ? rgb : 0);
         led_put_num(1, hour % 10, rgb);
         led_put_num(2, minu / 10, rgb);
@@ -204,6 +213,8 @@ void time_display_task() {
         last_minu = minu;
     }
     if (sec != last_sec) {
+        uint8_t rgb = sec & 7;
+        rgb += rgb == 0 ? 1 : 0;
         led_put_dp(1, sec & 1 ? rgb : 0);
         last_sec = sec;
     }
