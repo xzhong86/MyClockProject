@@ -91,7 +91,8 @@ void led_display_task() {
     static unsigned long last_update = 0;
     static uint8_t update_cnt = 0;
     unsigned long now = micros();
-    if (now - last_update < 250) // update period
+    if (last_update > now) last_update = 0; // overflow
+    if (now - last_update < 125) // update period
         return;
     bool led_on = ((1 << ((update_cnt >> 2) & 7)) & led_brightness_mask) != 0;
     led_update_bits(led_nums, led_dps);
@@ -192,32 +193,44 @@ void beep_out(int val) {  // pwm 0 - 255
 
 // ******** Application code ********
 
-void time_display_task() {
-    static uint8_t last_minu = 0xff;
-    static uint8_t last_sec = 0xff;
+static void update_hour_minute(uint8_t rgb) {
     RtcDateTime now = Rtc.GetDateTime();
     uint8_t hour = now.Hour();
     uint8_t minu = now.Minute();
     uint8_t sec  = now.Second();
-    led_set_brightness(4);
-    if (minu != last_minu) {
-        bool pm = hour > 12;
-        hour   -= hour > 12 ? 12 : 0;
-        uint8_t rgb = minu & 7;
+    bool pm = hour > 12;
+    hour   -= hour > 12 ? 12 : 0;
+    if (rgb == 0) {
+        rgb = minu & 7;
         rgb += rgb == 0 ? 1 : 0;
-        led_put_num(0, hour > 9 ? 1 : 0, hour > 9 ? rgb : 0);
-        led_put_num(1, hour % 10, rgb);
-        led_put_num(2, minu / 10, rgb);
-        led_put_num(3, minu % 10, rgb);
-        led_put_dp (0, pm ? rgb : 0);    // 'PM' mark
-        last_minu = minu;
     }
-    if (sec != last_sec) {
-        uint8_t rgb = sec & 7;
-        rgb += rgb == 0 ? 1 : 0;
-        led_put_dp(1, sec & 1 ? rgb : 0);
-        last_sec = sec;
+    led_put_num(0, hour > 9 ? 1 : 0, hour > 9 ? rgb : 0);
+    led_put_num(1, hour % 10, rgb);
+    led_put_num(2, minu / 10, rgb);
+    led_put_num(3, minu % 10, rgb);
+    led_put_dp (0, pm ? rgb : 0);    // 'PM' mark
+}
+
+void time_display_setup() {
+    update_hour_minute(0);
+    led_set_brightness(1);
+}
+
+void time_display_task() {
+    static unsigned long last_update = 0;
+    static uint8_t sec_cnt = 0;
+    unsigned long now = millis();
+    if (last_update > now) last_update = 0;
+    if (now - last_update < 1000)
+        return;
+    last_update = now; // + (now - last_update - 1000);
+    sec_cnt ++;
+    if (sec_cnt % 32 == 0) {
+        update_hour_minute(0);
     }
+    uint8_t rgb = (sec_cnt >> 1) & 7;
+    rgb += rgb == 0 ? 1 : 0;
+    led_put_dp(1, sec_cnt & 1 ? rgb : 0);
 }
 
 void led_test_task() {
@@ -262,7 +275,7 @@ void setup() {
     led_setup();
     Serial.begin(9600);
     rtc_setup();
-
+    time_display_setup();
     Serial.println("setup done.");
 }
 
