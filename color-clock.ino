@@ -209,7 +209,7 @@ void time_display_task() {
         led_put_num(1, hour % 10, rgb);
         led_put_num(2, minu / 10, rgb);
         led_put_num(3, minu % 10, rgb);
-        led_put_dp(0, rgb);    // 'PM' mark
+        led_put_dp (0, pm ? rgb : 0);    // 'PM' mark
         last_minu = minu;
     }
     if (sec != last_sec) {
